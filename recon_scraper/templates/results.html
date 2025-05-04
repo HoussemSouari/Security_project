@@ -29,6 +29,10 @@
         .btn-primary {
             background-color: #0d6efd;
             border-color: #0d6efd;
+            transition: background-color 0.2s;
+        }
+        .btn-primary:hover {
+            background-color: #0b5ed7;
         }
         .file-card {
             transition: transform 0.2s;
@@ -44,6 +48,9 @@
         }
         .csv-icon {
             color: #20c997;
+        }
+        .alert-info {
+            background-color: #e7f1ff;
         }
     </style>
 </head>
@@ -74,7 +81,7 @@
                     <div class="card-body">
                         {% if files %}
                             <div class="row">
-                                {% for file in files %}
+                                {% for file in files|sort(attribute='date', reverse=True) %}
                                     <div class="col-md-6 col-lg-4 mb-4">
                                         <div class="card file-card">
                                             <div class="card-body">
@@ -104,7 +111,9 @@
                             </div>
                         {% else %}
                             <div class="alert alert-info">
-                                Aucun fichier de résultat disponible.
+                                <strong>Aucun fichier de résultat disponible.</strong><br>
+                                Lancez une nouvelle reconnaissance depuis <a href="/" class="alert-link">l'outil principal</a>.<br>
+                                Si vous ne voyez pas de résultats, vérifiez <code>scraper.log</code> pour les erreurs et assurez-vous que les mots-clés correspondent au contenu du site.
                             </div>
                         {% endif %}
                     </div>

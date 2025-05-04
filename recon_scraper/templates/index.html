@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ReconScraper - Outil de reconnaissance</title>
+    <title>ReconScraper - Web Scraper For Security Project</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
@@ -72,6 +72,10 @@
             max-width: 100%;
             display: inline-block;
         }
+        .error-message {
+            display: none;
+            margin-top: 1rem;
+        }
     </style>
 </head>
 <body>
@@ -103,7 +107,7 @@
                         <form id="scraperForm">
                             <div class="mb-3">
                                 <label for="urlInput" class="form-label">URL cible</label>
-                                <input type="url" class="form-control" id="urlInput" placeholder="https://example.com" required>
+                                <input type="url" class="form-control" id="urlInput" placeholder="https://www.w3.org" required>
                                 <div class="form-text">L'URL du site web à analyser</div>
                             </div>
                             
@@ -129,10 +133,18 @@
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label for="delayInput" class="form-label">Délai (secondes)</label>
-                                        <input type="number" class="form-control" id="delayInput" min="0.5" step="0.5" value="1">
-                                        <div class="form-text">Délai entre les requêtes pour éviter la détection</div>
+                                        <label for="maxUrlsInput" class="form-label">URLs maximum</label>
+                                        <input type="number" class="form-control" id="maxUrlsInput" min="1" value="10">
+                                        <div class="form-text">Nombre maximum d'URLs à analyser</div>
                                     </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="ignoreRobotsInput">
+                                    <label class="form-check-label" for="ignoreRobotsInput">Ignorer robots.txt</label>
+                                    <div class="form-text">Ignorer les restrictions de robots.txt (à utiliser avec précaution)</div>
                                 </div>
                             </div>
                             
@@ -142,6 +154,7 @@
                                 </button>
                             </div>
                         </form>
+                        <div class="alert alert-danger error-message" id="errorMessage"></div>
                     </div>
                 </div>
                 
@@ -229,6 +242,7 @@
         const keywordInput = document.getElementById('keywordInput');
         const addKeywordBtn = document.getElementById('addKeywordBtn');
         const keywordsList = document.getElementById('keywordsList');
+        const errorMessage = document.getElementById('errorMessage');
         let keywords = [];
         
         // Ajouter un mot-clé
@@ -267,7 +281,7 @@
             }
         });
         
-        // Logs de scraping simulés
+        // Logs de scraping
         function addLog(message) {
             const log = document.getElementById('scrapingLog');
             const line = document.createElement('div');
@@ -277,49 +291,51 @@
         }
         
         // Formulaire de soumission
-        document.getElementById('scraperForm').addEventListener('submit', function(e) {
+        document.getElementById('scraperForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const url = document.getElementById('urlInput').value;
             const depth = document.getElementById('depthInput').value;
-            const delay = document.getElementById('delayInput').value;
+            const maxUrls = document.getElementById('maxUrlsInput').value;
+            const ignoreRobots = document.getElementById('ignoreRobotsInput').checked;
             
             if (!url) {
-                alert('Veuillez saisir une URL cible');
+                errorMessage.textContent = 'Veuillez saisir une URL cible';
+                errorMessage.style.display = 'block';
                 return;
             }
             
-            // Afficher le chargement
+            // Réinitialiser l'interface
+            errorMessage.style.display = 'none';
             document.getElementById('loadingIndicator').style.display = 'block';
             document.getElementById('resultsContainer').style.display = 'none';
+            document.getElementById('scrapingLog').innerHTML = '<div>$ Initialisation du scraper...</div>';
             
-            // Logs simulés
+            // Logs
             addLog(`Initialisation de la reconnaissance pour ${url}`);
             addLog(`Mots-clés configurés: ${keywords.join(', ') || 'Aucun'}`);
-            addLog(`Profondeur: ${depth}, Délai: ${delay}s`);
+            addLog(`Profondeur: ${depth}, URLs maximum: ${maxUrls}`);
+            addLog(`Ignorer robots.txt: ${ignoreRobots}`);
             
-            // Envoi de la requête au serveur
-            fetch('/api/scrape', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    url: url,
-                    keywords: keywords.join(','),
-                    depth: depth,
-                    delay: delay
-                })
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Erreur lors de la requête');
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.error) {
-                    throw new Error(data.error);
+            try {
+                const response = await fetch('/api/scrape', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        url: url,
+                        keywords: keywords.join(','),
+                        depth: parseInt(depth),
+                        max_urls: parseInt(maxUrls),
+                        ignore_robots: ignoreRobots
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok || data.error) {
+                    throw new Error(data.error || 'Erreur lors de la requête');
                 }
                 
                 // Mise à jour des fichiers de téléchargement
@@ -333,6 +349,9 @@
                 addLog(`Reconnaissance terminée avec succès`);
                 addLog(`${data.visitedUrls} URLs visitées`);
                 addLog(`${data.results.length} résultats trouvés`);
+                if (data.log) {
+                    addLog(data.log);
+                }
                 
                 // Remplir le tableau de résultats
                 const resultsTable = document.getElementById('resultsTable');
@@ -367,17 +386,15 @@
                 });
                 
                 // Afficher les résultats
-                setTimeout(() => {
-                    document.getElementById('loadingIndicator').style.display = 'none';
-                    document.getElementById('resultsContainer').style.display = 'block';
-                }, 1000);
-            })
-            .catch(error => {
-                console.error('Erreur:', error);
-                addLog(`Erreur: ${error.message}`);
-                alert(`Erreur: ${error.message}`);
                 document.getElementById('loadingIndicator').style.display = 'none';
-            });
+                document.getElementById('resultsContainer').style.display = 'block';
+            } catch (error) {
+                console.error('Erreur:', error);
+                errorMessage.textContent = `Erreur: ${error.message}. Vérifiez scraper.log pour plus de détails.`;
+                errorMessage.style.display = 'block';
+                addLog(`Erreur: ${error.message}`);
+                document.getElementById('loadingIndicator').style.display = 'none';
+            }
         });
         
         // Boutons de téléchargement

@@ -1,99 +1,138 @@
-
 import argparse
+import asyncio
 import csv
 import json
+import logging
 import os
 import random
 import re
-import sys
 import time
 from urllib.parse import urljoin, urlparse
+from urllib.robotparser import RobotFileParser
 
-import requests
+import aiohttp
 from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
 from rich.console import Console
 from rich.progress import Progress
 from rich.table import Table
 
+# Configure logging
+logging.basicConfig(
+    filename='scraper.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
 class ReconScraper:
     """
-    Scraper web pour la phase de reconnaissance en cybersécurité.
-    Permet de collecter des informations à partir d'un site web cible
-    en recherchant des mots-clés spécifiques.
+    Web scraper for cybersecurity reconnaissance phase.
+    Collects information from a target website by searching for specific keywords.
+    Respects privacy and site restrictions.
     """
     
-    def __init__(self, target_url, keywords=None, depth=1, delay=1, output_dir="results"):
+    def __init__(self, target_url, keywords=None, depth=1, output_dir="results", max_urls=100, ignore_robots=False):
         """
-        Initialise le scraper avec les paramètres de base.
+        Initialize the scraper with basic parameters.
         
         Args:
-            target_url (str): URL cible à scraper
-            keywords (list): Liste de mots-clés à rechercher
-            depth (int): Profondeur de crawling (nombre de niveaux à traverser)
-            delay (float): Délai entre les requêtes en secondes
-            output_dir (str): Répertoire pour enregistrer les résultats
+            target_url (str): Target URL to scrape
+            keywords (list): List of keywords to search
+            depth (int): Crawling depth
+            output_dir (str): Directory to save results
+            max_urls (int): Maximum number of URLs to crawl
+            ignore_robots (bool): Ignore robots.txt for testing
         """
         self.target_url = target_url
         self.keywords = keywords or []
         self.depth = depth
-        self.delay = delay
         self.output_dir = output_dir
+        self.max_urls = max_urls
+        self.ignore_robots = ignore_robots
         self.visited_urls = set()
         self.results = []
         self.console = Console()
         
-        # Vérifier et créer le répertoire de sortie
+        # Create output directory
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         
-        # Configurations pour éviter la détection
+        # Configurations to avoid detection
         self.user_agent = UserAgent()
         self.headers = {"User-Agent": self.user_agent.random}
         
-        # Analyse de l'URL cible
+        # Parse target URL
         parsed_url = urlparse(target_url)
         self.base_domain = parsed_url.netloc
         self.scheme = parsed_url.scheme
         
-    def _get_random_user_agent(self):
-        """Retourne un User-Agent aléatoire pour éviter la détection."""
-        return self.user_agent.random
-    
-    def _request_page(self, url):
+        # Initialize robots.txt parser
+        self.robot_parser = RobotFileParser()
+        if not ignore_robots:
+            self._check_robots_txt()
+        else:
+            logging.info("Ignoring robots.txt as per configuration")
+
+    def _check_robots_txt(self):
+        """Check and parse robots.txt for the target site."""
+        robots_url = f"{self.scheme}://{self.base_domain}/robots.txt"
+        try:
+            response = requests.get(robots_url, timeout=5)
+            if response.status_code == 200:
+                self.robot_parser.parse(response.text.splitlines())
+                logging.info(f"Parsed robots.txt from {robots_url}")
+            else:
+                self.console.print(f"[yellow]No robots.txt found at {robots_url}[/yellow]")
+                logging.warning(f"No robots.txt found at {robots_url}")
+        except Exception as e:
+            self.console.print(f"[yellow]Error accessing robots.txt: {e}[/yellow]")
+            logging.error(f"Error accessing robots.txt: {e}")
+
+    async def _request_page(self, url, session):
         """
-        Effectue une requête HTTP avec gestion des erreurs.
+        Perform an async HTTP request with error handling and retries.
         
         Args:
-            url (str): URL à requêter
+            url (str): URL to request
+            session: aiohttp ClientSession
             
         Returns:
-            str: Contenu HTML de la page ou None en cas d'erreur
+            str: HTML content or None if error
         """
-        try:
-            # Rotation du User-Agent pour éviter la détection
-            self.headers["User-Agent"] = self._get_random_user_agent()
-            
-            response = requests.get(url, headers=self.headers, timeout=10)
-            response.raise_for_status()
-            return response.text
-        except requests.exceptions.RequestException as e:
-            self.console.print(f"[bold red]Erreur lors de la requête à {url}: {e}[/bold red]")
+        if not self.ignore_robots and not self.robot_parser.can_fetch(self.headers["User-Agent"], url):
+            self.console.print(f"[yellow]URL {url} blocked by robots.txt[/yellow]")
+            logging.info(f"Skipped {url} due to robots.txt")
             return None
-        except Exception as e:
-            self.console.print(f"[bold red]Erreur inattendue: {e}[/bold red]")
-            return None
+
+        for attempt in range(3):  # Retry up to 3 times
+            try:
+                self.headers["User-Agent"] = self.user_agent.random
+                async with session.get(url, headers=self.headers, timeout=15) as response:
+                    if response.status == 200:
+                        content = await response.text()
+                        logging.info(f"Successfully fetched {url}")
+                        return content
+                    else:
+                        self.console.print(f"[red]Error {response.status} for {url}[/red]")
+                        logging.error(f"Error {response.status} for {url}")
+                        return None
+            except Exception as e:
+                self.console.print(f"[red]Attempt {attempt+1} failed for {url}: {e}[/red]")
+                logging.error(f"Attempt {attempt+1} failed for {url}: {e}")
+                if attempt < 2:
+                    await asyncio.sleep(random.uniform(1, 3))  # Wait before retry
+        return None
     
     def extract_links(self, html, current_url):
         """
-        Extrait les liens d'une page HTML.
+        Extract links from HTML content.
         
         Args:
-            html (str): Contenu HTML
-            current_url (str): URL actuelle pour résoudre les liens relatifs
+            html (str): HTML content
+            current_url (str): Current URL to resolve relative links
             
         Returns:
-            list: Liste des URLs trouvées
+            list: List of found URLs
         """
         if not html:
             return []
@@ -103,38 +142,37 @@ class ReconScraper:
         
         for a_tag in soup.find_all('a', href=True):
             href = a_tag['href']
-            # Résoudre les URLs relatives
             full_url = urljoin(current_url, href)
             parsed_url = urlparse(full_url)
             
-            # Ne garder que les liens du même domaine
             if parsed_url.netloc == self.base_domain:
                 links.append(full_url)
                 
-        return list(set(links))  # Éliminer les doublons
+        links = list(set(links))
+        logging.info(f"Extracted {len(links)} links from {current_url}")
+        return links
     
     def search_keywords(self, html, url):
         """
-        Recherche les mots-clés dans le contenu HTML.
+        Search for keywords in HTML content.
         
         Args:
-            html (str): Contenu HTML
-            url (str): URL de la page
+            html (str): HTML content
+            url (str): Page URL
             
         Returns:
-            list: Liste des correspondances trouvées
+            list: List of findings
         """
         if not html or not self.keywords:
+            logging.info(f"No HTML or keywords for {url}")
             return []
         
         soup = BeautifulSoup(html, 'html.parser')
-        # Obtenir le texte visible de la page
         text = soup.get_text()
         
         findings = []
         for keyword in self.keywords:
-            # Recherche insensible à la casse
-            pattern = re.compile(r'\b' + re.escape(keyword) + r'\b', re.IGNORECASE)
+            pattern = re.compile(re.escape(keyword), re.IGNORECASE)
             matches = pattern.findall(text)
             
             if matches:
@@ -143,24 +181,7 @@ class ReconScraper:
                     "occurrences": len(matches),
                     "contexts": self._get_contexts(text, keyword, 30)
                 })
-                
-        # Collecter les emails
-        emails = self._extract_emails(text)
-        if emails:
-            findings.append({
-                "keyword": "EMAIL",
-                "occurrences": len(emails),
-                "contexts": emails
-            })
-            
-        # Collecter les numéros de téléphone
-        phones = self._extract_phones(text)
-        if phones:
-            findings.append({
-                "keyword": "PHONE",
-                "occurrences": len(phones),
-                "contexts": phones
-            })
+                logging.info(f"Found {len(matches)} occurrences of '{keyword}' on {url}")
         
         if findings:
             result = {
@@ -171,21 +192,22 @@ class ReconScraper:
             self.results.append(result)
             return findings
         
+        logging.info(f"No keyword matches found on {url}")
         return []
     
     def _get_contexts(self, text, keyword, context_size=30):
         """
-        Extrait le contexte autour des occurrences d'un mot-clé.
+        Extract context around keyword occurrences.
         
         Args:
-            text (str): Texte complet
-            keyword (str): Mot-clé à rechercher
-            context_size (int): Nombre de caractères avant/après pour le contexte
+            text (str): Full text
+            keyword (str): Keyword to search
+            context_size (int): Characters before/after for context
             
         Returns:
-            list: Liste des contextes trouvés (limités à 5 pour éviter les résultats trop volumineux)
+            list: List of contexts (limited to 5)
         """
-        pattern = re.compile(r'\b' + re.escape(keyword) + r'\b', re.IGNORECASE)
+        pattern = re.compile(re.escape(keyword), re.IGNORECASE)
         contexts = []
         
         for match in pattern.finditer(text):
@@ -193,140 +215,125 @@ class ReconScraper:
             end = min(len(text), match.end() + context_size)
             context = text[start:end].replace('\n', ' ').strip()
             contexts.append(f"...{context}...")
-            
-            # Limiter à 5 contextes par mot-clé
             if len(contexts) >= 5:
                 break
                 
         return contexts
     
-    def _extract_emails(self, text):
-        """Extrait les adresses e-mail du texte."""
-        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-        return re.findall(email_pattern, text)
-    
-    def _extract_phones(self, text):
-        """Extrait les numéros de téléphone du texte (format international)."""
-        # Pattern simple pour les numéros internationaux
-        phone_pattern = r'\+?\d{1,4}?[-.\s]?\(?\d{1,3}?\)?[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}'
-        return re.findall(phone_pattern, text)
-    
     def _get_page_title(self, soup):
-        """Extrait le titre de la page."""
+        """Extract page title."""
         title_tag = soup.find('title')
-        return title_tag.text if title_tag else "Sans titre"
+        return title_tag.text if title_tag else "No title"
         
-    def crawl(self):
+    async def crawl(self):
         """
-        Lance le processus de crawling et de scraping.
+        Run the async crawling and scraping process.
         """
-        # Affichage des informations de démarrage
         self.console.print(f"[bold green]╔══════════════════════════════════════╗[/bold green]")
         self.console.print(f"[bold green]║    RECONNAISSANCE SCRAPER ACTIF      ║[/bold green]")
         self.console.print(f"[bold green]╚══════════════════════════════════════╝[/bold green]")
         self.console.print(f"[bold blue]Target URL:[/bold blue] {self.target_url}")
-        self.console.print(f"[bold blue]Keywords:[/bold blue] {', '.join(self.keywords) if self.keywords else 'Aucun'}")
+        self.console.print(f"[bold blue]Keywords:[/bold blue] {', '.join(self.keywords) if self.keywords else 'None'}")
         self.console.print(f"[bold blue]Depth:[/bold blue] {self.depth}")
+        self.console.print(f"[bold blue]Max URLs:[/bold blue] {self.max_urls}")
         self.console.print()
         
-        # Initialisation de la file de crawling
-        to_crawl = [(self.target_url, 0)]  # (url, profondeur)
+        to_crawl = [(self.target_url, 0)]  # (url, depth)
         
-        with Progress() as progress:
-            task = progress.add_task("[cyan]Scraping en cours...", total=None)
-            
-            while to_crawl:
-                current_url, current_depth = to_crawl.pop(0)
+        async with aiohttp.ClientSession() as session:
+            with Progress() as progress:
+                task = progress.add_task("[cyan]Scraping...", total=None)
                 
-                # Vérifier si l'URL a déjà été visitée
-                if current_url in self.visited_urls:
-                    continue
-                
-                # Marquer comme visitée
-                self.visited_urls.add(current_url)
-                
-                # Mise à jour de la progression
-                progress.update(task, description=f"[cyan]Scraping de {current_url}[/cyan]")
-                
-                # Récupérer le contenu de la page
-                html = self._request_page(current_url)
-                if not html:
-                    continue
-                
-                # Rechercher les mots-clés
-                findings = self.search_keywords(html, current_url)
-                if findings:
-                    progress.console.print(f"[green]✓[/green] Trouvé {len(findings)} résultat(s) sur {current_url}")
-                
-                # Si on n'a pas atteint la profondeur maximale, extraire les liens
-                if current_depth < self.depth:
-                    links = self.extract_links(html, current_url)
+                while to_crawl and len(self.visited_urls) < self.max_urls:
+                    current_url, current_depth = to_crawl.pop(0)
                     
-                    # Ajouter les nouveaux liens à la file d'attente
-                    for link in links:
-                        if link not in self.visited_urls:
-                            to_crawl.append((link, current_depth + 1))
-                
-                # Délai pour éviter de surcharger le serveur
-                time.sleep(self.delay)
+                    if current_url in self.visited_urls:
+                        continue
+                    
+                    self.visited_urls.add(current_url)
+                    progress.update(task, description=f"[cyan]Scraping {current_url}[/cyan]")
+                    
+                    html = await self._request_page(current_url, session)
+                    if not html:
+                        continue
+                    
+                    findings = self.search_keywords(html, current_url)
+                    if findings:
+                        progress.console.print(f"[green]✓[/green] Found {len(findings)} result(s) on {current_url}")
+                    
+                    if current_depth < self.depth:
+                        links = self.extract_links(html, current_url)
+                        for link in links:
+                            if link not in self.visited_urls:
+                                to_crawl.append((link, current_depth + 1))
+                    
+                    await asyncio.sleep(random.uniform(0.5, 1.5))
         
-        self.console.print(f"\n[bold green]Scraping terminé![/bold green]")
-        self.console.print(f"[bold blue]URLs visitées:[/bold blue] {len(self.visited_urls)}")
-        self.console.print(f"[bold blue]Résultats trouvés:[/bold blue] {len(self.results)}")
+        self.console.print(f"\n[bold green]Scraping completed![/bold green]")
+        self.console.print(f"[bold blue]URLs visited:[/bold blue] {len(self.visited_urls)}")
+        self.console.print(f"[bold blue]Results found:[/bold blue] {len(self.results)}")
+        logging.info(f"Scraping completed: {len(self.visited_urls)} URLs visited, {len(self.results)} results found")
     
     def save_results(self):
         """
-        Enregistre les résultats dans différents formats.
+        Save results in JSON and CSV formats.
         """
         if not self.results:
-            self.console.print("[yellow]Aucun résultat à enregistrer.[/yellow]")
+            self.console.print("[yellow]No results to save.[/yellow]")
+            logging.warning("No results to save")
             return
         
         timestamp = time.strftime("%Y%m%d-%H%M%S")
         base_filename = f"recon_{urlparse(self.target_url).netloc}_{timestamp}"
         
-        # Enregistrer en JSON
         json_path = os.path.join(self.output_dir, f"{base_filename}.json")
-        with open(json_path, 'w', encoding='utf-8') as f:
-            json.dump(self.results, f, ensure_ascii=False, indent=4)
-        
-        # Enregistrer en CSV (version simplifiée)
         csv_path = os.path.join(self.output_dir, f"{base_filename}.csv")
-        with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerow(['URL', 'Titre', 'Mot-clé', 'Occurrences', 'Contexte'])
-            
-            for result in self.results:
-                url = result['url']
-                title = result['title']
-                
-                for finding in result['findings']:
-                    keyword = finding['keyword']
-                    occurrences = finding['occurrences']
-                    
-                    if 'contexts' in finding and finding['contexts']:
-                        for context in finding['contexts']:
-                            writer.writerow([url, title, keyword, occurrences, context])
-                    else:
-                        writer.writerow([url, title, keyword, occurrences, ''])
         
-        self.console.print(f"[bold green]Résultats sauvegardés dans:[/bold green]")
+        try:
+            with open(json_path, 'w', encoding='utf-8') as f:
+                json.dump(self.results, f, ensure_ascii=False, indent=4)
+            logging.info(f"Successfully saved JSON to {json_path}")
+        except Exception as e:
+            self.console.print(f"[red]Failed to save JSON: {e}[/red]")
+            logging.error(f"Failed to save JSON to {json_path}: {e}")
+        
+        try:
+            with open(csv_path, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow(['URL', 'Title', 'Keyword', 'Occurrences', 'Context'])
+                
+                for result in self.results:
+                    url = result['url']
+                    title = result['title']
+                    
+                    for finding in result['findings']:
+                        keyword = finding['keyword']
+                        occurrences = finding['occurrences']
+                        contexts = finding.get('contexts', [])
+                        for context in contexts:
+                            writer.writerow([url, title, keyword, occurrences, context])
+            logging.info(f"Successfully saved CSV to {csv_path}")
+        except Exception as e:
+            self.console.print(f"[red]Failed to save CSV: {e}[/red]")
+            logging.error(f"Failed to save CSV to {csv_path}: {e}")
+        
+        self.console.print(f"[bold green]Results saved to:[/bold green]")
         self.console.print(f"  - JSON: {json_path}")
         self.console.print(f"  - CSV: {csv_path}")
     
     def display_results(self):
         """
-        Affiche un résumé des résultats.
+        Display a summary of results.
         """
         if not self.results:
-            self.console.print("[yellow]Aucun résultat à afficher.[/yellow]")
+            self.console.print("[yellow]No results to display.[/yellow]")
+            logging.warning("No results to display")
             return
         
-        # Créer un tableau pour afficher les résultats
         table = Table(show_header=True, header_style="bold magenta")
         table.add_column("URL")
-        table.add_column("Titre")
-        table.add_column("Mot-clé")
+        table.add_column("Title")
+        table.add_column("Keyword")
         table.add_column("Occurrences", justify="right")
         
         for result in self.results:
@@ -344,16 +351,17 @@ class ReconScraper:
                     str(occurrences)
                 )
         
-        self.console.print("\n[bold]Résumé des résultats:[/bold]")
+        self.console.print("\n[bold]Results Summary:[/bold]")
         self.console.print(table)
 
 def main():
-    parser = argparse.ArgumentParser(description='ReconScraper - Web Scraper pour la phase de reconnaissance')
-    parser.add_argument('--url', '-u', required=True, help='URL cible à scraper')
-    parser.add_argument('--keywords', '-k', nargs='+', help='Mots-clés à rechercher')
-    parser.add_argument('--depth', '-d', type=int, default=1, help='Profondeur de crawling (défaut: 1)')
-    parser.add_argument('--delay', type=float, default=1.0, help='Délai entre les requêtes en secondes (défaut: 1.0)')
-    parser.add_argument('--output', '-o', default='results', help='Répertoire pour enregistrer les résultats (défaut: results)')
+    parser = argparse.ArgumentParser(description='ReconScraper - Ethical Web Scraper for Reconnaissance')
+    parser.add_argument('--url', '-u', required=True, help='Target URL to scrape')
+    parser.add_argument('--keywords', '-k', nargs='+', help='Keywords to search')
+    parser.add_argument('--depth', '-d', type=int, default=1, help='Crawling depth (default: 1)')
+    parser.add_argument('--output', '-o', default='results', help='Output directory (default: results)')
+    parser.add_argument('--max-urls', type=int, default=100, help='Maximum URLs to crawl (default: 100)')
+    parser.add_argument('--ignore-robots', action='store_true', help='Ignore robots.txt for testing')
     
     args = parser.parse_args()
     
@@ -361,17 +369,24 @@ def main():
         target_url=args.url,
         keywords=args.keywords,
         depth=args.depth,
-        delay=args.delay,
-        output_dir=args.output
+        output_dir=args.output,
+        max_urls=args.max_urls,
+        ignore_robots=args.ignore_robots
     )
     
     try:
-        scraper.crawl()
+        asyncio.run(scraper.crawl())
         scraper.display_results()
         scraper.save_results()
     except KeyboardInterrupt:
-        print("\nOpération interrompue par l'utilisateur.")
+        print("\nOperation interrupted by user.")
+        logging.info("Operation interrupted by user")
         sys.exit(1)
+    except Exception as e:
+        logging.error(f"Scraping failed: {e}")
+        print(f"Scraping failed: {e}")
 
 if __name__ == '__main__':
+    import requests
+    import sys
     main()

@@ -1,8 +1,16 @@
 /recon_scraper/__pycache__/
 
+# Exclude all __pycache__ directories
+__pycache__/
+*/__pycache__/
+*/**/__pycache__/
 
+# Log files
 scraper.log
-
-/results
-
 api.log
+
+# Results files but keep the folders
+/results/*.json
+/results/*.csv
+/recon_scraper/results/*.json
+/recon_scraper/results/*.csv

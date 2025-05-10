@@ -1,0 +1,44 @@
+/* Additional dark theme overrides for Bootstrap table */
+.table {
+  --bs-table-bg: var(--bg-card) !important; /* Override Bootstrap's bg */
+  --bs-table-color: var(--text-light) !important; /* Override Bootstrap's text color */
+  --bs-table-striped-bg: var(--bg-dark) !important; /* For striped tables */
+  --bs-table-striped-color: var(--text-light) !important;
+  --bs-table-hover-bg: rgba(255, 255, 255, 0.05) !important; /* For hover effect */
+  --bs-table-hover-color: var(--text-light) !important;
+  --bs-table-border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Override any Bootstrap utility classes that might be applied */
+.bg-white, .bg-light {
+  background-color: var(--bg-card) !important;
+}
+
+/* Ensure text in table remains visible */
+.table th, 
+.table td, 
+.table tr,
+.table tbody,
+.table thead {
+  color: var(--text-light) !important;
+  background-color: var(--bg-card) !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Better styling for the occurrences column to make it stand out */
+#resultsTable td:last-child {
+  font-weight: bold;
+  color: var(--secondary-light) !important;
+}
+
+/* Enhance the title column with better readability */
+#resultsTable td:nth-child(2) {
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+/* Make sure the keywords are easily visible */
+#resultsTable td:nth-child(3) {
+  color: var(--primary-light) !important;
+  font-weight: 500;
+}

@@ -1,82 +1,17 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ReconScraper - Web Scraper For Security Project</title>
+    <!-- External CSS Libraries -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <style>
-        body {
-            background-color: #f8f9fa;
-        }
-        .header {
-            background-color: #343a40;
-            color: white;
-            padding: 2rem 0;
-            margin-bottom: 2rem;
-        }
-        .card {
-            border: none;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            margin-bottom: 1.5rem;
-        }
-        .card-header {
-            background-color: #212529;
-            color: white;
-            font-weight: bold;
-        }
-        .btn-primary {
-            background-color: #0d6efd;
-            border-color: #0d6efd;
-        }
-        .loading {
-            display: none;
-            text-align: center;
-            padding: 2rem;
-        }
-        .results {
-            display: none;
-        }
-        .keyword-pill {
-            display: inline-block;
-            padding: 0.25rem 0.5rem;
-            background-color: #e9ecef;
-            border-radius: 16px;
-            margin-right: 0.5rem;
-            margin-bottom: 0.5rem;
-            font-size: 0.875rem;
-        }
-        .remove-keyword {
-            cursor: pointer;
-            margin-left: 5px;
-        }
-        #keywordInput {
-            border-radius: 0.25rem;
-            border: 1px solid #ced4da;
-            padding: 0.375rem 0.75rem;
-        }
-        .terminal {
-            background-color: #212529;
-            color: #20c997;
-            font-family: monospace;
-            padding: 1rem;
-            border-radius: 0.25rem;
-            height: 300px;
-            overflow-y: auto;
-        }
-        .url-badge {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            max-width: 100%;
-            display: inline-block;
-        }
-        .error-message {
-            display: none;
-            margin-top: 1rem;
-        }
-    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/table-overrides.css">
+    <link rel="stylesheet" href="/static/css/magic-carpet.css">
 </head>
 <body>
     <div class="header">
@@ -84,11 +19,11 @@
             <div class="row align-items-center">
                 <div class="col-md-6">
                     <h1><i class="bi bi-binoculars-fill"></i> ReconScraper</h1>
-                    <p class="lead">Outil de reconnaissance pour la collecte d'informations</p>
+                    <p class="lead">Reconnaissance tool for information gathering</p>
                 </div>
                 <div class="col-md-6 text-end">
-                    <a href="/results" class="btn btn-outline-light">
-                        <i class="bi bi-file-earmark-text"></i> Voir les résultats précédents
+                    <a href="/results" class="btn btn-action">
+                        <i class="bi bi-file-earmark-text"></i> View previous results
                     </a>
                 </div>
             </div>
@@ -97,121 +32,126 @@
 
     <div class="container">
         <div class="row">
-            <div class="col-lg-8 mx-auto">
-                <!-- Formulaire de configuration -->
+            <div class="col-lg-10 mx-auto">
+                <!-- Configuration Form -->
                 <div class="card">
                     <div class="card-header">
-                        <i class="bi bi-gear-fill"></i> Configuration du Scraper
+                        <i class="bi bi-gear-fill"></i> Scraper Configuration
+                        <button class="btn btn-sm btn-outline-light toggle-icon section-toggle" data-target="configContent">
+                            <i class="bi bi-chevron-up"></i>
+                        </button>
                     </div>
                     <div class="card-body">
-                        <form id="scraperForm">
-                            <div class="mb-3">
-                                <label for="urlInput" class="form-label">URL cible</label>
-                                <input type="url" class="form-control" id="urlInput" placeholder="https://www.w3.org" required>
-                                <div class="form-text">L'URL du site web à analyser</div>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label class="form-label">Mots-clés à rechercher</label>
-                                <div class="input-group mb-2">
-                                    <input type="text" id="keywordInput" class="form-control" placeholder="Ajouter un mot-clé">
-                                    <button type="button" id="addKeywordBtn" class="btn btn-outline-secondary">
-                                        <i class="bi bi-plus"></i> Ajouter
+                        <div id="configContent" class="collapse-content show">
+                            <form id="scraperForm">
+                                <div class="mb-4">
+                                    <label for="urlInput" class="form-label">Target URL</label>
+                                    <input type="url" class="form-control" id="urlInput" placeholder="https://www.w3.org" required>
+                                    <div class="form-text">The URL of the website to analyze</div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <label class="form-label">Keywords to search</label>
+                                    <div class="input-group mb-3">
+                                        <input type="text" id="keywordInput" class="form-control" placeholder="Add a keyword">
+                                        <button type="button" id="addKeywordBtn" class="btn btn-outline-light">
+                                            <i class="bi bi-plus"></i> Add
+                                        </button>
+                                    </div>
+                                    <div id="keywordsList" class="mb-3"></div>
+                                    <div class="form-text">Keywords will be searched in the content of pages</div>
+                                </div>
+                                
+                                <div class="row mb-4">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="depthInput" class="form-label">Depth</label>
+                                            <input type="number" class="form-control" id="depthInput" min="1" max="3" value="1">
+                                            <div class="form-text">Number of link levels to follow</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="maxUrlsInput" class="form-label">Maximum URLs</label>
+                                            <input type="number" class="form-control" id="maxUrlsInput" min="1" value="10">
+                                            <div class="form-text">Maximum number of URLs to analyze</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="ignoreRobotsInput">
+                                        <label class="form-check-label" for="ignoreRobotsInput">Ignore robots.txt</label>
+                                        <div class="form-text">Ignore robots.txt restrictions (use with caution)</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary btn-lg">
+                                        <i class="bi bi-search"></i> Start Reconnaissance
                                     </button>
                                 </div>
-                                <div id="keywordsList" class="mb-2"></div>
-                                <div class="form-text">Les mots-clés seront recherchés dans le contenu des pages</div>
-                            </div>
-                            
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="depthInput" class="form-label">Profondeur</label>
-                                        <input type="number" class="form-control" id="depthInput" min="1" max="3" value="1">
-                                        <div class="form-text">Nombre de niveaux de liens à suivre</div>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="maxUrlsInput" class="form-label">URLs maximum</label>
-                                        <input type="number" class="form-control" id="maxUrlsInput" min="1" value="10">
-                                        <div class="form-text">Nombre maximum d'URLs à analyser</div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <div class="form-check">
-                                    <input type="checkbox" class="form-check-input" id="ignoreRobotsInput">
-                                    <label class="form-check-label" for="ignoreRobotsInput">Ignorer robots.txt</label>
-                                    <div class="form-text">Ignorer les restrictions de robots.txt (à utiliser avec précaution)</div>
-                                </div>
-                            </div>
-                            
-                            <div class="d-grid gap-2">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="bi bi-search"></i> Lancer la reconnaissance
-                                </button>
-                            </div>
-                        </form>
-                        <div class="alert alert-danger error-message" id="errorMessage"></div>
+                            </form>
+                            <div class="alert alert-danger error-message" id="errorMessage"></div>
+                        </div>
                     </div>
                 </div>
-                
-                <!-- Indicateur de chargement -->
-                <div class="loading" id="loadingIndicator">
+                  <!-- Loading indicator (hidden by default) -->
+                <div class="loading" id="loadingIndicator" style="display: none;">
                     <div class="card">
+                        <div class="card-header">
+                            <i class="bi bi-hourglass-split"></i> Processing
+                        </div>
                         <div class="card-body">
                             <div class="d-flex justify-content-center">
                                 <div class="spinner-border text-primary" role="status">
-                                    <span class="visually-hidden">Chargement...</span>
+                                    <span class="visually-hidden">Loading...</span>
                                 </div>
                             </div>
-                            <p class="text-center mt-3">Reconnaissance en cours... Cela peut prendre quelques minutes.</p>
+                            <p class="text-center mt-4 mb-4">Reconnaissance in progress... This may take a few minutes.</p>
                             <div class="terminal" id="scrapingLog">
-                                <div>$ Initialisation du scraper...</div>
+                                <div>$ Initializing scraper...</div>
                             </div>
                         </div>
                     </div>
                 </div>
                 
-                <!-- Résultats -->
-                <div class="results" id="resultsContainer">
+                <!-- Results (hidden by default) -->
+                <div class="results" id="resultsContainer" style="display: none;">
                     <div class="card">
                         <div class="card-header d-flex justify-content-between align-items-center">
-                            <span><i class="bi bi-list-check"></i> Résultats de la reconnaissance</span>
-                            <div>
-                                <button class="btn btn-sm btn-outline-light" id="jsonDownloadBtn">
+                            <span><i class="bi bi-list-check"></i> Reconnaissance Results</span>
+                            <div>                                <button class="btn btn-sm" id="jsonDownloadBtn">
                                     <i class="bi bi-filetype-json"></i> JSON
                                 </button>
-                                <button class="btn btn-sm btn-outline-light" id="csvDownloadBtn">
+                                <button class="btn btn-sm" id="csvDownloadBtn">
                                     <i class="bi bi-filetype-csv"></i> CSV
                                 </button>
                             </div>
                         </div>
                         <div class="card-body">
-                            <div class="mb-3">
+                            <div class="mb-4">
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="alert alert-info">
-                                            <strong>URLs visitées:</strong> <span id="visitedUrlsCount">0</span>
+                                            <strong>URLs visited:</strong> <span id="visitedUrlsCount">0</span>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="alert alert-success">
-                                            <strong>Résultats trouvés:</strong> <span id="resultsCount">0</span>
+                                            <strong>Results found:</strong> <span id="resultsCount">0</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            
-                            <div class="table-responsive">
-                                <table class="table table-striped table-hover">
+                              <div class="table-responsive" style="background-color: var(--bg-card);">
+                                <table class="table">
                                     <thead>
                                         <tr>
                                             <th>URL</th>
-                                            <th>Titre</th>
-                                            <th>Mot-clé</th>
+                                            <th>Title</th>
+                                            <th>Keyword</th>
                                             <th>Occurrences</th>
                                         </tr>
                                     </thead>
@@ -223,102 +163,167 @@
                 </div>
             </div>
         </div>
-    </div>
-    
-    <footer class="bg-dark text-white mt-5 py-3">
+    </div>    <footer class="bg-dark text-white mt-5 py-3">
         <div class="container text-center">
-            <p class="mb-0">ReconScraper | Outil de reconnaissance pour la sécurité informatique</p>
+            <p class="mb-0" style="color: #a0aec0;">ReconScraper | Reconnaissance tool for computer security</p>
         </div>
-    </footer>
-
+    </footer>    <!-- Bootstrap & jQuery for enhanced interactions -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Magic Carpet Effect -->
+    <script src="/static/js/magic-carpet.js"></script>
+    
+    <!-- Application script -->
     <script>
-        // Variables globales pour les téléchargements
-        let downloadFiles = {
-            json: '',
-            csv: ''
-        };
-        
-        // Gestion des mots-clés
-        const keywordInput = document.getElementById('keywordInput');
-        const addKeywordBtn = document.getElementById('addKeywordBtn');
-        const keywordsList = document.getElementById('keywordsList');
-        const errorMessage = document.getElementById('errorMessage');
-        let keywords = [];
-        
-        // Ajouter un mot-clé
-        function addKeyword() {
-            const keyword = keywordInput.value.trim();
-            if (keyword && !keywords.includes(keyword)) {
-                keywords.push(keyword);
-                renderKeywords();
-                keywordInput.value = '';
-            }
-        }
-        
-        // Supprimer un mot-clé
-        function removeKeyword(index) {
-            keywords.splice(index, 1);
-            renderKeywords();
-        }
-        
-        // Afficher les mots-clés
-        function renderKeywords() {
-            keywordsList.innerHTML = '';
-            keywords.forEach((keyword, index) => {
-                const pill = document.createElement('span');
-                pill.className = 'keyword-pill';
-                pill.innerHTML = `${keyword} <span class="remove-keyword" onclick="removeKeyword(${index})">×</span>`;
-                keywordsList.appendChild(pill);
+        // DOM manipulation only after page fully loads
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("DOM loaded");
+            
+            // Global variables
+            let keywords = [];
+            let downloadFiles = {
+                json: '',
+                csv: ''
+            };
+            
+            // Get UI elements
+            const keywordInput = document.getElementById('keywordInput');
+            const addKeywordBtn = document.getElementById('addKeywordBtn');
+            const keywordsList = document.getElementById('keywordsList');
+            const errorMessage = document.getElementById('errorMessage');
+            const scraperForm = document.getElementById('scraperForm');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const resultsContainer = document.getElementById('resultsContainer');
+            
+            // Hide loading and results initially
+            loadingIndicator.style.display = 'none';
+            resultsContainer.style.display = 'none';
+            
+            // Add card toggle functionality
+            const toggleButtons = document.querySelectorAll('.section-toggle');
+            toggleButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const targetId = this.getAttribute('data-target');
+                    const target = document.getElementById(targetId);
+                    const icon = this.querySelector('i');
+                    
+                    if (target.classList.contains('show')) {
+                        target.classList.remove('show');
+                        icon.classList.remove('bi-chevron-up');
+                        icon.classList.add('bi-chevron-down');
+                    } else {
+                        target.classList.add('show');
+                        icon.classList.remove('bi-chevron-down');
+                        icon.classList.add('bi-chevron-up');
+                    }
+                });
             });
-        }
-        
-        // Événements pour les mots-clés
-        addKeywordBtn.addEventListener('click', addKeyword);
-        keywordInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
+            
+            // Add keyword functionality
+            function addKeyword() {
+                console.log("Adding keyword");
+                const keyword = keywordInput.value.trim();
+                if (keyword && !keywords.includes(keyword)) {
+                    keywords.push(keyword);
+                    renderKeywords();
+                    keywordInput.value = '';
+                }
+            }
+            
+            // Remove keyword functionality
+            function removeKeyword(index) {
+                console.log("Removing keyword at index: " + index);
+                keywords.splice(index, 1);
+                renderKeywords();
+            }
+            
+            // Render keywords list
+            function renderKeywords() {
+                keywordsList.innerHTML = '';
+                keywords.forEach((keyword, index) => {
+                    const pill = document.createElement('span');
+                    pill.className = 'keyword-pill';
+                    pill.innerHTML = `${keyword} <span class="remove-keyword" data-index="${index}">×</span>`;
+                    keywordsList.appendChild(pill);
+                });
+                
+                // Add event listeners to remove buttons
+                document.querySelectorAll('.remove-keyword').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const index = parseInt(this.getAttribute('data-index'));
+                        removeKeyword(index);
+                    });
+                });
+            }
+            
+            // Add keyword events
+            addKeywordBtn.addEventListener('click', addKeyword);
+            
+            keywordInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addKeyword();
+                }
+            });
+            
+            // Logging function
+            function addLog(message) {
+                const log = document.getElementById('scrapingLog');
+                const line = document.createElement('div');
+                line.textContent = `$ ${message}`;
+                log.appendChild(line);
+                log.scrollTop = log.scrollHeight;
+            }
+            
+            // Form submission
+            scraperForm.addEventListener('submit', function(e) {
+                // Prevent page refresh
                 e.preventDefault();
-                addKeyword();
-            }
-        });
-        
-        // Logs de scraping
-        function addLog(message) {
-            const log = document.getElementById('scrapingLog');
-            const line = document.createElement('div');
-            line.textContent = `$ ${message}`;
-            log.appendChild(line);
-            log.scrollTop = log.scrollHeight;
-        }
-        
-        // Formulaire de soumission
-        document.getElementById('scraperForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const url = document.getElementById('urlInput').value;
-            const depth = document.getElementById('depthInput').value;
-            const maxUrls = document.getElementById('maxUrlsInput').value;
-            const ignoreRobots = document.getElementById('ignoreRobotsInput').checked;
-            
-            if (!url) {
-                errorMessage.textContent = 'Veuillez saisir une URL cible';
-                errorMessage.style.display = 'block';
-                return;
-            }
-            
-            // Réinitialiser l'interface
-            errorMessage.style.display = 'none';
-            document.getElementById('loadingIndicator').style.display = 'block';
-            document.getElementById('resultsContainer').style.display = 'none';
-            document.getElementById('scrapingLog').innerHTML = '<div>$ Initialisation du scraper...</div>';
-            
-            // Logs
-            addLog(`Initialisation de la reconnaissance pour ${url}`);
-            addLog(`Mots-clés configurés: ${keywords.join(', ') || 'Aucun'}`);
-            addLog(`Profondeur: ${depth}, URLs maximum: ${maxUrls}`);
-            addLog(`Ignorer robots.txt: ${ignoreRobots}`);
-            
-            try {
-                const response = await fetch('/api/scrape', {
+                console.log("Form submitted");
+                
+                const submitBtn = this.querySelector('button[type="submit"]');
+                
+                // Add loading state to button
+                if (submitBtn) {
+                    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+                    submitBtn.disabled = true;
+                }
+                
+                // Get form values
+                const url = document.getElementById('urlInput').value;
+                const depth = document.getElementById('depthInput').value;
+                const maxUrls = document.getElementById('maxUrlsInput').value;
+                const ignoreRobots = document.getElementById('ignoreRobotsInput').checked;
+                
+                if (!url) {
+                    errorMessage.textContent = 'Please enter a target URL';
+                    errorMessage.style.display = 'block';
+                    if (submitBtn) {
+                        submitBtn.innerHTML = '<i class="bi bi-search"></i> Start Reconnaissance';
+                        submitBtn.disabled = false;
+                    }
+                    return;
+                }
+                
+                // Reset interface
+                errorMessage.style.display = 'none';
+                loadingIndicator.style.display = 'block';
+                resultsContainer.style.display = 'none';
+                document.getElementById('scrapingLog').innerHTML = '<div>$ Initializing scraper...</div>';
+                
+                // Smooth scroll to terminal
+                setTimeout(() => {
+                    loadingIndicator.scrollIntoView({ behavior: 'smooth' });
+                }, 300);
+                
+                // Logs
+                addLog(`Initialization of reconnaissance for ${url}`);
+                addLog(`Configured keywords: ${keywords.join(', ') || 'None'}`);
+                addLog(`Depth: ${depth}, Maximum URLs: ${maxUrls}`);
+                addLog(`Ignore robots.txt: ${ignoreRobots}`);
+                
+                // Make the API request
+                fetch('/api/scrape', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -330,88 +335,104 @@
                         max_urls: parseInt(maxUrls),
                         ignore_robots: ignoreRobots
                     })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.error) {
+                        // Update download files
+                        downloadFiles = data.files;
+                        
+                        // Update counters
+                        document.getElementById('visitedUrlsCount').textContent = data.visitedUrls;
+                        document.getElementById('resultsCount').textContent = data.results.length;
+                        
+                        // Success logs
+                        addLog(`Reconnaissance completed successfully`);
+                        addLog(`${data.visitedUrls} URLs visited`);
+                        addLog(`${data.results.length} results found`);
+                        if (data.log) {
+                            addLog(data.log);
+                        }
+                        
+                        // Fill the results table
+                        const resultsTable = document.getElementById('resultsTable');
+                        resultsTable.innerHTML = '';
+                        
+                        data.results.forEach(result => {
+                            result.findings.forEach(finding => {
+                                const row = document.createElement('tr');
+                                
+                                const urlCell = document.createElement('td');
+                                const urlBadge = document.createElement('span');
+                                urlBadge.className = 'url-badge';
+                                urlBadge.title = result.url;
+                                urlBadge.textContent = result.url;
+                                urlCell.appendChild(urlBadge);
+                                row.appendChild(urlCell);
+                                
+                                const titleCell = document.createElement('td');
+                                titleCell.textContent = result.title;
+                                row.appendChild(titleCell);
+                                
+                                const keywordCell = document.createElement('td');
+                                keywordCell.textContent = finding.keyword;
+                                row.appendChild(keywordCell);
+                                
+                                const occurrencesCell = document.createElement('td');
+                                occurrencesCell.textContent = finding.occurrences;
+                                row.appendChild(occurrencesCell);
+                                
+                                resultsTable.appendChild(row);
+                            });
+                        });
+                        
+                        // Display results
+                        loadingIndicator.style.display = 'none';
+                        resultsContainer.style.display = 'block';
+                    } else {
+                        throw new Error(data.error || 'Error during the request');
+                    }
+                    
+                    // Reset button state
+                    if (submitBtn) {
+                        submitBtn.innerHTML = '<i class="bi bi-search"></i> Start Reconnaissance';
+                        submitBtn.disabled = false;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    errorMessage.textContent = `Error: ${error.message}. Check scraper.log for more details.`;
+                    errorMessage.style.display = 'block';
+                    addLog(`Error: ${error.message}`);
+                    loadingIndicator.style.display = 'none';
+                    
+                    // Reset button state
+                    if (submitBtn) {
+                        submitBtn.innerHTML = '<i class="bi bi-search"></i> Start Reconnaissance';
+                        submitBtn.disabled = false;
+                    }
                 });
-                
-                const data = await response.json();
-                
-                if (!response.ok || data.error) {
-                    throw new Error(data.error || 'Erreur lors de la requête');
+            });              // Download buttons
+            document.getElementById('jsonDownloadBtn').addEventListener('click', function() {
+                if (downloadFiles.json) {
+                    console.log("Downloading JSON: " + downloadFiles.json);
+                    window.location.href = '/downloads/' + downloadFiles.json;
+                } else {
+                    console.error("No JSON file available for download");
+                    alert("No JSON file available for download");
                 }
-                
-                // Mise à jour des fichiers de téléchargement
-                downloadFiles = data.files;
-                
-                // Mettre à jour les compteurs
-                document.getElementById('visitedUrlsCount').textContent = data.visitedUrls;
-                document.getElementById('resultsCount').textContent = data.results.length;
-                
-                // Logs de succès
-                addLog(`Reconnaissance terminée avec succès`);
-                addLog(`${data.visitedUrls} URLs visitées`);
-                addLog(`${data.results.length} résultats trouvés`);
-                if (data.log) {
-                    addLog(data.log);
+            });
+            
+            document.getElementById('csvDownloadBtn').addEventListener('click', function() {
+                if (downloadFiles.csv) {
+                    console.log("Downloading CSV: " + downloadFiles.csv);
+                    window.location.href = '/downloads/' + downloadFiles.csv;
+                } else {
+                    console.error("No CSV file available for download");
+                    alert("No CSV file available for download");
                 }
-                
-                // Remplir le tableau de résultats
-                const resultsTable = document.getElementById('resultsTable');
-                resultsTable.innerHTML = '';
-                
-                data.results.forEach(result => {
-                    result.findings.forEach(finding => {
-                        const row = document.createElement('tr');
-                        
-                        const urlCell = document.createElement('td');
-                        const urlBadge = document.createElement('span');
-                        urlBadge.className = 'url-badge';
-                        urlBadge.title = result.url;
-                        urlBadge.textContent = result.url;
-                        urlCell.appendChild(urlBadge);
-                        row.appendChild(urlCell);
-                        
-                        const titleCell = document.createElement('td');
-                        titleCell.textContent = result.title;
-                        row.appendChild(titleCell);
-                        
-                        const keywordCell = document.createElement('td');
-                        keywordCell.textContent = finding.keyword;
-                        row.appendChild(keywordCell);
-                        
-                        const occurrencesCell = document.createElement('td');
-                        occurrencesCell.textContent = finding.occurrences;
-                        row.appendChild(occurrencesCell);
-                        
-                        resultsTable.appendChild(row);
-                    });
-                });
-                
-                // Afficher les résultats
-                document.getElementById('loadingIndicator').style.display = 'none';
-                document.getElementById('resultsContainer').style.display = 'block';
-            } catch (error) {
-                console.error('Erreur:', error);
-                errorMessage.textContent = `Erreur: ${error.message}. Vérifiez scraper.log pour plus de détails.`;
-                errorMessage.style.display = 'block';
-                addLog(`Erreur: ${error.message}`);
-                document.getElementById('loadingIndicator').style.display = 'none';
-            }
+            });
         });
-        
-        // Boutons de téléchargement
-        document.getElementById('jsonDownloadBtn').addEventListener('click', function() {
-            if (downloadFiles.json) {
-                window.location.href = `/downloads/${downloadFiles.json}`;
-            }
-        });
-        
-        document.getElementById('csvDownloadBtn').addEventListener('click', function() {
-            if (downloadFiles.csv) {
-                window.location.href = `/downloads/${downloadFiles.csv}`;
-            }
-        });
-        
-        // Initialisation
-        window.removeKeyword = removeKeyword;
     </script>
 </body>
 </html>

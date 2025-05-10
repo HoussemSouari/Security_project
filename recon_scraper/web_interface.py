@@ -16,11 +16,27 @@ from recon_scraper import ReconScraper
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = 'results'
+
+# Set absolute path for the upload folder
+current_dir = os.path.dirname(os.path.abspath(__file__))
+app.config['UPLOAD_FOLDER'] = os.path.join(current_dir, 'results')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+
+# Log the absolute path
+logging.info(f"Upload folder absolute path: {app.config['UPLOAD_FOLDER']}")
 
 # Create the results directory if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# Serve static files
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    return send_from_directory('static', filename)
+
+# Create static directory if it doesn't exist
+os.makedirs('static', exist_ok=True)
+os.makedirs('static/css', exist_ok=True)
+os.makedirs('static/js', exist_ok=True)
 
 @app.route('/')
 def index():
@@ -49,7 +65,7 @@ def scrape():
             target_url=target_url,
             keywords=keywords,
             depth=depth,
-            output_dir=app.config['UPLOAD_FOLDER'],
+            output_dir=app.config['UPLOAD_FOLDER'],  # Use the absolute path from app.config
             max_urls=max_urls,
             ignore_robots=ignore_robots
         )
@@ -96,19 +112,51 @@ def scrape():
 def download_file(filename):
     try:
         logging.info(f"Attempting to serve file download: {filename}")
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        if not os.path.exists(file_path):
-            logging.error(f"File not found: {file_path}")
-            return jsonify({'error': f'File {filename} not found'}), 404
-        logging.info(f"Serving file: {file_path}")
-        return send_from_directory(
-            app.config['UPLOAD_FOLDER'], 
-            filename, 
-            as_attachment=True
-        )
-    except FileNotFoundError:
-        logging.error(f"File not found error for: {filename}")
-        return jsonify({'error': f'File {filename} not found'}), 404
+        logging.info(f"Upload folder path: {app.config['UPLOAD_FOLDER']}")
+        
+        # Check if file exists in the configured upload folder
+        direct_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        logging.info(f"Full file path: {direct_path}")
+        logging.info(f"File exists: {os.path.exists(direct_path)}")
+        
+        if os.path.exists(direct_path) and os.path.isfile(direct_path):
+            logging.info(f"File found at path: {direct_path}")
+            return flask.send_file(
+                direct_path,
+                as_attachment=True,
+                download_name=filename
+            )
+        
+        # If the file wasn't found in the configured path, try the root results folder
+        project_root = os.path.dirname(current_dir)  # Go up one level from recon_scraper dir
+        root_results_dir = os.path.join(project_root, 'results')
+        alt_path = os.path.join(root_results_dir, filename)
+        logging.info(f"Trying alternative path: {alt_path}")
+        logging.info(f"Alternative path exists: {os.path.exists(alt_path)}")
+        
+        if os.path.exists(alt_path) and os.path.isfile(alt_path):
+            logging.info(f"File found at alternative path: {alt_path}")
+            return flask.send_file(
+                alt_path,
+                as_attachment=True,
+                download_name=filename
+            )
+        
+        # For debugging purposes, list all files in both directories
+        logging.info("Listing all files in upload folder:")
+        if os.path.exists(app.config['UPLOAD_FOLDER']):
+            for f in os.listdir(app.config['UPLOAD_FOLDER']):
+                logging.info(f"  - {f}")
+        
+        logging.info("Listing all files in root results folder:")
+        if os.path.exists(root_results_dir):
+            for f in os.listdir(root_results_dir):
+                logging.info(f"  - {f}")
+        
+        # File not found in either location
+        logging.error(f"File not found: {filename}")
+        return jsonify({'error': f'File {filename} not found in either results folder'}), 404
+        
     except Exception as e:
         logging.error(f"Download failed: {str(e)}", exc_info=True)
         return jsonify({'error': f'Download failed: {str(e)}'}), 500
